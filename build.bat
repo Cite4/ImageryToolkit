@@ -1,0 +1,1 @@
+pyinstaller --onefile --name ImageryToolkit --noconsole --clean imagerytoolkit.py
