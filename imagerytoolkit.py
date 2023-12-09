@@ -4,7 +4,7 @@ import os
 import uuid
 import pprint
 
-ftype = ['.jpg', '.jpeg', '.png', '.gif', '.raw', '.tiff']
+ftype = ['.jpg', '.jpeg', '.png', '.gif', '.raw', '.tiff', '.cr2', '.arw']
 
 config = {
     'title':'ImageryToolkit',
@@ -14,8 +14,8 @@ config = {
     'minsize_h':400,
     'location':'',
     'destination':'',
-    'filetypes':['.jpg', '.jpeg', '.png', '.gif', '.raw', '.tiff'],
-    'checkbox_filetypes':['.jpg', '.jpeg', '.png', '.gif', '.raw', '.tiff'],
+    'filetypes':ftype.copy(),
+    'checkbox_filetypes':ftype.copy(),
     'delimiter':'',
     'sortmode':'',
     'sortmodeOptions':['Date Best Guess', 'EXIF Date Photo Taken', 'EXIF Date Photo Changed', 'EXIF Image Sensor', 'EXIF Camera Model'],
@@ -62,10 +62,10 @@ structure_preview_column = [
                 auto_size_columns=False,
                 select_mode=sg.TABLE_SELECT_MODE_EXTENDED,
                 num_rows=15,
-                col0_width=0,
+                col0_width=3,
                 col_widths = [10,],
                 key='-TREE-',
-                show_expanded=True,
+                show_expanded=False,
                 enable_events=True,
                 expand_x=True,
                 expand_y=True,
@@ -134,11 +134,42 @@ class mainapp:
                 treedata = sg.TreeData()
                 fs = self.ds.file_structure
                 #pprint.pprint(fs)
+                used_years = []
+                used_months = []
+                used_days = []
                 for dir, files in fs.items():
-                    treedata.Insert('', dir, '', values=[dir])
-                for dir, files in fs.items():
-                    for file in files:
-                        treedata.Insert(dir, file, '', values=[file])
+                    date_tree = {}
+                    if 'date' in config['sortmode'].lower():
+                        year, month, day = dir.split(self.ds.date_delimiter)
+                        if year not in date_tree:
+                            date_tree[year] = {}
+                        if month not in date_tree[year]:
+                            date_tree[year][month] = {}
+                        if day not in date_tree[year][month]:
+                            date_tree[year][month][day] = files
+                        for year in date_tree.keys():
+                            if year not in used_years:
+                                used_years.append(year)
+                                #print(f'Inserting year {year}')
+                                treedata.Insert('', year, '', values=[year])
+                            for month in date_tree[year].keys():
+                                if month not in used_months:
+                                    #print(f'Inserting month {month}')
+                                    treedata.Insert(year, month, '', values=[month])
+                                    used_months.append(month)
+                                for day, files in date_tree[year][month].items():
+                                    if day not in used_days:
+                                        #print(f'Inserting day {day}')
+                                        treedata.Insert(month, day, '', values=[day])
+                                        used_days.append(day)
+                                    for file in files:
+                                        treedata.Insert(day, file, '', values=[file])
+                    else:
+                                
+                        treedata.Insert('', dir, '', values=[dir])    
+                        for dir, files in fs.items():
+                            for file in files:
+                                treedata.Insert(dir, file, '', values=[file])
                 tree.update(values=treedata)
                 tree.expand(True, True)
             if event == "EXECUTE":
@@ -147,11 +178,42 @@ class mainapp:
                 treedata = sg.TreeData()
                 fs = self.ds.file_structure
                 #pprint.pprint(fs)
+                used_years = []
+                used_months = []
+                used_days = []
                 for dir, files in fs.items():
-                    treedata.Insert('', dir, '', values=[dir])
-                for dir, files in fs.items():
-                    for file in files:
-                        treedata.Insert(dir, file, '', values=[file])
+                    date_tree = {}
+                    if 'date' in config['sortmode'].lower():
+                        year, month, day = dir.split(self.ds.date_delimiter)
+                        if year not in date_tree:
+                            date_tree[year] = {}
+                        if month not in date_tree[year]:
+                            date_tree[year][month] = {}
+                        if day not in date_tree[year][month]:
+                            date_tree[year][month][day] = files
+                        for year in date_tree.keys():
+                            if year not in used_years:
+                                used_years.append(year)
+                                #print(f'Inserting year {year}')
+                                treedata.Insert('', year, '', values=[year])
+                            for month in date_tree[year].keys():
+                                if month not in used_months:
+                                    #print(f'Inserting month {month}')
+                                    treedata.Insert(year, month, '', values=[month])
+                                    used_months.append(month)
+                                for day, files in date_tree[year][month].items():
+                                    if day not in used_days:
+                                        #print(f'Inserting day {day}')
+                                        treedata.Insert(month, day, '', values=[day])
+                                        used_days.append(day)
+                                    for file in files:
+                                        treedata.Insert(day, file, '', values=[file])
+                    else:
+                                
+                        treedata.Insert('', dir, '', values=[dir])    
+                        for dir, files in fs.items():
+                            for file in files:
+                                treedata.Insert(dir, file, '', values=[file])
                 tree.update(values=treedata)
                 tree.expand(True, True)
                 self.ds.exec_sort(progbar=self.window['-PBAR-'])

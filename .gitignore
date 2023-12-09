@@ -1,5 +1,6 @@
 build/
 dist/
-modules/pycache/
+modules/__pycache__/
 ImageryToolkit.spec
 scratchpad.ipynb
+.gitignore

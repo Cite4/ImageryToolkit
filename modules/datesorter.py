@@ -17,37 +17,43 @@ class ds:
         
     def preload_file_data(self):
         self.files = {}
-        for f in os.listdir(self.location):
-            name, extension = os.path.splitext(f)
-            if extension.lower() not in self.sort_filetypes:
-                print(f'SKIPPING IMAGE: {f} WITH EXTENSION: {extension.lower()}')
-                continue
-            else:
-                
-                file_dirized = f'{self.location}/{f}'
-                with PIL.Image.open(file_dirized) as pilimg:
-                    exif = pilimg._getexif()
-                    #extract EXIF into dict
-                    self.files[f] = {
-                        'location':file_dirized,
-                        'name':name,
-                        'extension':(extension.lower()).replace('.',''),
-                        'EXIF Date Photo Taken': exif[36867].split(' ')[0].replace(':', '/') if 36867 in exif.keys() else '',
-                        'EXIF Date Photo Changed': exif[306].split(' ')[0].replace(':', '/') if 306 in exif.keys() else '',
-                        'EXIF Image Sensor': exif[37399] if 37399 in exif.keys() else '',
-                        'EXIF Camera Model': exif[50708] if 50708 in exif.keys() else ''
-                    }
-                    
-                    #extract best guess values
-                    if 36867 in exif.keys():
-                        self.files[f]['Date Best Guess'] = exif[36867].split(' ')[0].replace(':', '/')
-                    elif 306 in exif.keys():
-                        self.files[f]['Date Best Guess'] = exif[306].split(' ')[0].replace(':', '/')
-                    elif os.path.getctime(file_dirized):
-                        self.files[f]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(file_dirized)).strftime('%Y-%m-%d %H:%M:%S')
-                    else:
-                        self.files[f]['Date Best Guess'] = ''
-        print('DATA LOADED.')
+        dirlist = [x for x in os.walk(self.location)]
+        #for f in os.listdir(self.location):
+        for i in dirlist:
+            directory = i[0]
+            subfolders = i[1]
+            files = i[2]
+            for f in files:
+                name, extension = os.path.splitext(f)
+                if extension.lower() not in self.sort_filetypes:
+                    print(f'SKIPPING IMAGE: {f} WITH EXTENSION: {extension.lower()}')
+                    continue
+                else:
+                    #file_dirized = f'{self.location}/{f}'
+                    file_dirized = f'{directory}/{f}'
+                    with PIL.Image.open(file_dirized) as pilimg:
+                        exif = pilimg._getexif()
+                        #extract EXIF into dict
+                        self.files[f] = {
+                            'location':file_dirized,
+                            'name':name,
+                            'extension':(extension.lower()).replace('.',''),
+                            'EXIF Date Photo Taken': exif[36867].split(' ')[0].replace(':', '/') if 36867 in exif.keys() else '',
+                            'EXIF Date Photo Changed': exif[306].split(' ')[0].replace(':', '/') if 306 in exif.keys() else '',
+                            'EXIF Image Sensor': exif[37399] if 37399 in exif.keys() else '',
+                            'EXIF Camera Model': exif[50708] if 50708 in exif.keys() else ''
+                        }
+                        
+                        #extract best guess values
+                        if 36867 in exif.keys():
+                            self.files[f]['Date Best Guess'] = exif[36867].split(' ')[0].replace(':', '/')
+                        elif 306 in exif.keys():
+                            self.files[f]['Date Best Guess'] = exif[306].split(' ')[0].replace(':', '/')
+                        elif os.path.getctime(file_dirized):
+                            self.files[f]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(file_dirized)).strftime('%Y-%m-%d %H:%M:%S')
+                        else:
+                            self.files[f]['Date Best Guess'] = ''
+            print('DATA LOADED.')
                     
                             
     def stage_sort(self, sort_by):
@@ -90,11 +96,19 @@ class ds:
         progbar.update(current_count=curr, max=maxval)
         for dir, files in self.file_structure.items():
             curr += 1
-            dirloc = f'{destination_name}/{dir}'
-            if os.path.isdir(dirloc):
-                pass
+            dirloc = f'{destination_name}'
+            if self.date_delimiter in dir:
+                for sd in dir.split(self.date_delimiter):
+                    dirloc += f'/{sd}'
             else:
-                os.mkdir(dirloc)
+                dirloc += f'/{dir}'
+            builddir = ''
+            for dirlvl in dirloc.split('/'):
+                builddir += f'{dirlvl}/'  
+                if os.path.isdir(builddir):
+                    pass
+                else:
+                    os.mkdir(builddir)
             for file in files:
                 src = f'{self.location}/{file}'
                 dst = f'{dirloc}/{file}'
