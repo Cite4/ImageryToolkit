@@ -3,6 +3,7 @@ import re
 import PIL.Image
 import datetime
 import shutil
+import uuid
 
 class ds:
     def __init__(self, date_delimiter) -> None:
@@ -14,6 +15,7 @@ class ds:
         self.files = {}
         self.file_structure = {}
         self.missed_files = []
+        self.exif_supported_ftypes = ['.jpeg', '.jpg', '.png']
         
     def preload_file_data(self):
         self.files = {}
@@ -31,28 +33,35 @@ class ds:
                 else:
                     #file_dirized = f'{self.location}/{f}'
                     file_dirized = f'{directory}/{f}'
-                    with PIL.Image.open(file_dirized) as pilimg:
-                        exif = pilimg._getexif()
-                        #extract EXIF into dict
-                        self.files[f] = {
-                            'location':file_dirized,
-                            'name':name,
-                            'extension':(extension.lower()).replace('.',''),
-                            'EXIF Date Photo Taken': exif[36867].split(' ')[0].replace(':', '/') if 36867 in exif.keys() else '',
-                            'EXIF Date Photo Changed': exif[306].split(' ')[0].replace(':', '/') if 306 in exif.keys() else '',
-                            'EXIF Image Sensor': exif[37399] if 37399 in exif.keys() else '',
-                            'EXIF Camera Model': exif[50708] if 50708 in exif.keys() else ''
-                        }
-                        
-                        #extract best guess values
-                        if 36867 in exif.keys():
-                            self.files[f]['Date Best Guess'] = exif[36867].split(' ')[0].replace(':', '/')
-                        elif 306 in exif.keys():
-                            self.files[f]['Date Best Guess'] = exif[306].split(' ')[0].replace(':', '/')
-                        elif os.path.getctime(file_dirized):
-                            self.files[f]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(file_dirized)).strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            self.files[f]['Date Best Guess'] = ''
+                    self.files[f] = {
+                        'location':file_dirized,
+                        'name':name,
+                        'extension':(extension.lower()).replace('.',''),
+                        'EXIF Date Photo Taken': '',
+                        'EXIF Date Photo Changed': '',
+                        'EXIF Image Sensor': '',
+                        'EXIF Camera Model': ''
+                    }
+                    
+                    if extension.lower() in [ext.lower() for ext, ftype in PIL.Image.registered_extensions().items()]:
+                        with PIL.Image.open(file_dirized) as pilimg:
+                            exif = pilimg._getexif()
+                            #extract EXIF into dict
+                            self.files[f]['EXIF Date Photo Taken'] = exif[36867].split(' ')[0].replace(':', '/') if 36867 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            self.files[f]['EXIF Date Photo Changed'] = exif[306].split(' ')[0].replace(':', '/') if 306 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            self.files[f]['EXIF Image Sensor'] = exif[37399] if 37399 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            self.files[f]['EXIF Camera Model'] = exif[50708] if 50708 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            #extract best guess values
+                            if 36867 in exif.keys():
+                                self.files[f]['Date Best Guess'] = exif[36867].split(' ')[0].replace(':', '/')
+                            elif 306 in exif.keys():
+                                self.files[f]['Date Best Guess'] = exif[306].split(' ')[0].replace(':', '/')
+                            elif os.path.getctime(file_dirized):
+                                self.files[f]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(file_dirized)).strftime('%Y-%m-%d %H:%M:%S')
+                            else:
+                                self.files[f]['Date Best Guess'] = ''
+                    else:
+                        self.files[f]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(file_dirized)).strftime('%Y-%m-%d %H:%M:%S')
             print('DATA LOADED.')
                     
                             
@@ -86,7 +95,7 @@ class ds:
         
     def exec_sort(self, progbar):
         destination_name = f'{self.destination}/sorted-{datetime.datetime.now().strftime("%m%d%Y%H%M%S")}'
-        print(f'copying data to: {destination_name}')
+        #print(f'copying data to: {destination_name}')
         try:  
             os.mkdir(destination_name)  
         except OSError as error:  

@@ -1,10 +1,10 @@
-from modules import datesorter
+from modules import datesorterv2 as datesorter
 import PySimpleGUI as sg
-import os
-import uuid
-import pprint
+#import os
+#import uuid
+#import pprint
 
-ftype = ['.jpg', '.jpeg', '.png', '.gif', '.raw', '.tiff', '.cr2', '.arw']
+ftype = ['.jpg', '.jpeg', '.png', '.gif', '.raw', '.tiff', '.cr2', '.arw', '.dng']
 
 config = {
     'title':'ImageryToolkit',
@@ -102,18 +102,19 @@ class mainapp:
         while True:
             event, values = self.window.read()
             if event != '':
-                print(event)
+                pass
+                #print(event)
             # End program if user closes window or
             # presses the OK button
             if event == "OK" or event == sg.WIN_CLOSED:
                 break
             if event in config['checkbox_filetypes']:
-                print(f'CHECKBOX EVENT: {event}')
+                #print(f'CHECKBOX EVENT: {event}')
                 if event in self.ds.sort_filetypes:
-                    print(f'dropping {event} from {self.ds.sort_filetypes}')
+                    #print(f'dropping {event} from {self.ds.sort_filetypes}')
                     self.ds.sort_filetypes.remove(event)
                 else:
-                    print(f'adding {event} to {self.ds.sort_filetypes}')
+                    #print(f'adding {event} to {self.ds.sort_filetypes}')
                     self.ds.sort_filetypes.append(event)
             if event == "-SOURCE_FOLDER-":
                 folder = values["-SOURCE_FOLDER-"]
@@ -121,8 +122,9 @@ class mainapp:
                 config['location'] = folder
                 self.ds.location = folder
                 self.ds.preload_file_data()
-                filenames = list(self.ds.files)
-                #print(filenames)
+                #filenames = list(self.ds.files)
+                filenames = list([v['file'] for k, v in self.ds.files.items()])
+                ##print(filenames)
                 self.window["-FILE LIST-"].update(filenames)
             if event == "-DEST_FOLDER-":
                 folder = values["-DEST_FOLDER-"]
@@ -132,8 +134,8 @@ class mainapp:
                 tree = self.window['-TREE-']
                 self.ds.stage_sort(sort_by=config['sortmode'])
                 treedata = sg.TreeData()
-                fs = self.ds.file_structure
-                #pprint.pprint(fs)
+                fs = self.ds.sorted_file_structure
+                #pprint.p#print(fs)
                 used_years = []
                 used_months = []
                 used_days = []
@@ -150,20 +152,21 @@ class mainapp:
                         for year in date_tree.keys():
                             if year not in used_years:
                                 used_years.append(year)
-                                #print(f'Inserting year {year}')
+                                ##print(f'Inserting year {year}')
                                 treedata.Insert('', year, '', values=[year])
                             for month in date_tree[year].keys():
                                 if month not in used_months:
-                                    #print(f'Inserting month {month}')
+                                    ##print(f'Inserting month {month}')
                                     treedata.Insert(year, month, '', values=[month])
                                     used_months.append(month)
                                 for day, files in date_tree[year][month].items():
                                     if day not in used_days:
-                                        #print(f'Inserting day {day}')
+                                        ##print(f'Inserting day {day}')
                                         treedata.Insert(month, day, '', values=[day])
                                         used_days.append(day)
                                     for file in files:
-                                        treedata.Insert(day, file, '', values=[file])
+                                        ref_file = self.ds.files[file]
+                                        treedata.Insert(day, file, '', values=[ref_file['file']])
                     else:
                                 
                         treedata.Insert('', dir, '', values=[dir])    
@@ -176,8 +179,8 @@ class mainapp:
                 tree = self.window['-TREE-']
                 self.ds.stage_sort(sort_by=config['sortmode'])
                 treedata = sg.TreeData()
-                fs = self.ds.file_structure
-                #pprint.pprint(fs)
+                fs = self.ds.sorted_file_structure
+                #pprint.p#print(fs)
                 used_years = []
                 used_months = []
                 used_days = []
@@ -194,20 +197,21 @@ class mainapp:
                         for year in date_tree.keys():
                             if year not in used_years:
                                 used_years.append(year)
-                                #print(f'Inserting year {year}')
+                                ##print(f'Inserting year {year}')
                                 treedata.Insert('', year, '', values=[year])
                             for month in date_tree[year].keys():
                                 if month not in used_months:
-                                    #print(f'Inserting month {month}')
+                                    ##print(f'Inserting month {month}')
                                     treedata.Insert(year, month, '', values=[month])
                                     used_months.append(month)
                                 for day, files in date_tree[year][month].items():
                                     if day not in used_days:
-                                        #print(f'Inserting day {day}')
+                                        ##print(f'Inserting day {day}')
                                         treedata.Insert(month, day, '', values=[day])
                                         used_days.append(day)
                                     for file in files:
-                                        treedata.Insert(day, file, '', values=[file])
+                                        ref_file = self.ds.files[file]
+                                        treedata.Insert(day, file, '', values=[ref_file['file']])
                     else:
                                 
                         treedata.Insert('', dir, '', values=[dir])    
@@ -218,7 +222,7 @@ class mainapp:
                 tree.expand(True, True)
                 self.ds.exec_sort(progbar=self.window['-PBAR-'])
             if event in config['sortmodeOptions']:
-                print(f'SORTMODE SET TO: {event}')
+                #print(f'SORTMODE SET TO: {event}')
                 config['sortmode'] = event
 
 
