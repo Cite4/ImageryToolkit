@@ -9,7 +9,7 @@ import uuid
 
 
 class ds:
-    def __init__(self, date_delimiter) -> None:
+    def __init__(self, date_delimiter, window) -> None:
         self.location = ''
         self.destination = ''
         self.sort_filetypes = []
@@ -21,7 +21,20 @@ class ds:
         self.missed_files = []
         self.exif_supported_ftypes = ['.jpeg', '.jpg', '.png']
         self.used_uuids = []
+        self.window = window
+        self.eventlog = ''
+        self.errorlog = ''
         
+    def logEvent(self, event, eventType='default'):
+        #print(f'EVENT TYPE: {eventType} | {event}')
+        logFormat = f'{datetime.datetime.now()} | > {event}\n'
+        match eventType:
+            case 'default':
+                self.eventlog+=logFormat
+                self.window['-EVENT_LOG-'].update(self.eventlog)
+            case 'fileSortError':
+                self.errorlog+=logFormat
+                self.window['-SORTFAIL_LOG-'].update(self.errorlog)
         
     def preload_file_data(self):
         self.files = {}
@@ -33,6 +46,7 @@ class ds:
             subfolders = i[1]
             files = i[2]
             #print(f'dir loaded: {directory}')
+            self.logEvent(event=f'dir loaded: {directory}')
             for f in files:
                 #print(f'loading file: {f}')
                 #generate uuid for file
@@ -62,26 +76,35 @@ class ds:
                 })
                 #print(f'exif extracted for file: {f}')
                 #identify support for PIL processing
-                if extension.lower() in [ext.lower() for ext, ftype in PIL.Image.registered_extensions().items()]:
-                    with PIL.Image.open(self.files[new_uuid]['full_path']) as pilimg:
-                        exif = pilimg._getexif()
-                        #extract EXIF into dict
-                        self.files[new_uuid]['EXIF Date Photo Taken'] = exif[36867].split(' ')[0].replace(':', '/') if 36867 in exif.keys() and extension in self.exif_supported_ftypes else ''
-                        self.files[new_uuid]['EXIF Date Photo Changed'] = exif[306].split(' ')[0].replace(':', '/') if 306 in exif.keys() and extension in self.exif_supported_ftypes else ''
-                        self.files[new_uuid]['EXIF Image Sensor'] = exif[37399] if 37399 in exif.keys() and extension in self.exif_supported_ftypes else ''
-                        self.files[new_uuid]['EXIF Camera Model'] = exif[50708] if 50708 in exif.keys() and extension in self.exif_supported_ftypes else ''
-                        #extract best guess values
-                        if 36867 in exif.keys():
-                            self.files[new_uuid]['Date Best Guess'] = exif[36867].split(' ')[0].replace(':', '/')
-                        elif 306 in exif.keys():
-                            self.files[new_uuid]['Date Best Guess'] = exif[306].split(' ')[0].replace(':', '/')
-                        elif os.path.getctime(self.files[new_uuid]['full_path']):
-                            self.files[new_uuid]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(self.files[new_uuid]['full_path'])).strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            self.files[new_uuid]['Date Best Guess'] = ''
-                else:
+                try:
+                    if extension.lower() in [ext.lower() for ext, ftype in PIL.Image.registered_extensions().items()]:
+                        with PIL.Image.open(self.files[new_uuid]['full_path']) as pilimg:
+                            exif = pilimg._getexif()
+                            #extract EXIF into dict
+                            self.files[new_uuid]['EXIF Date Photo Taken'] = exif[36867].split(' ')[0].replace(':', '/') if 36867 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            self.files[new_uuid]['EXIF Date Photo Changed'] = exif[306].split(' ')[0].replace(':', '/') if 306 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            self.files[new_uuid]['EXIF Image Sensor'] = exif[37399] if 37399 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            self.files[new_uuid]['EXIF Camera Model'] = exif[50708] if 50708 in exif.keys() and extension in self.exif_supported_ftypes else ''
+                            #extract best guess values
+                            if 36867 in exif.keys():
+                                self.files[new_uuid]['Date Best Guess'] = exif[36867].split(' ')[0].replace(':', '/')
+                            elif 306 in exif.keys():
+                                self.files[new_uuid]['Date Best Guess'] = exif[306].split(' ')[0].replace(':', '/')
+                            elif os.path.getctime(self.files[new_uuid]['full_path']):
+                                self.files[new_uuid]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(self.files[new_uuid]['full_path'])).strftime('%Y-%m-%d %H:%M:%S')
+                            else:
+                                self.files[new_uuid]['Date Best Guess'] = ''
+                    else:
+                        self.files[new_uuid]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(self.files[new_uuid]['full_path'])).strftime('%Y-%m-%d %H:%M:%S')
+                except AttributeError as ae:
+                    self.logEvent(event=f"file [{self.files[new_uuid]['full_path']}] has no EXIF, defaulting to windows API DT")
                     self.files[new_uuid]['Date Best Guess'] = datetime.datetime.fromtimestamp(os.path.getctime(self.files[new_uuid]['full_path'])).strftime('%Y-%m-%d %H:%M:%S')
-        
+                except Exception as ex:
+                    self.logEvent(event=f'file read fail: {self.files[new_uuid]["full_path"]} | {ex}', eventType='fileSortError')
+                    #TODO: Handle file read errors. Probably best to remove them from the sort options until a good handle practice can be implimented.
+                
+                self.logEvent(event=f'file read success: {self.files[new_uuid]["full_path"]}')
+                
     def stage_sort(self, sort_by):
         sortby_options = ['Date Best Guess', 'EXIF Date Photo Taken', 'EXIF Date Photo Changed', 'EXIF Image Sensor', 'EXIF Camera Model']
         if sort_by not in sortby_options:
@@ -94,6 +117,7 @@ class ds:
             sortby_value = f_tosort[sort_by]
             if sortby_value == '':
                 missed_files.append(f_tosort['file'])
+                self.logEvent(event=f'missed file: {f_tosort['file']} - file has no sortby value.', eventType='fileSortError')
             else:
                 if any(ext in f_tosort['file'].lower() for ext in self.sort_filetypes):
                     #print(f"{f_tosort['file']} has filetype in {self.sort_filetypes}")
@@ -103,9 +127,15 @@ class ds:
                         sortby_value = sortby_value.split(' ')[0]
                     if sortby_value not in sorted_file_structure.keys():
                         sorted_file_structure[sortby_value] = []
-                    sorted_file_structure[sortby_value].append(f_uuid)
+                    ###v UNTESTED v###
+                    filesInDir = [self.files[f_uuid]['file'] for f_uuid in sorted_file_structure[sortby_value]]
+                    if f_tosort['file'] in filesInDir:
+                        self.logEvent(event=f'missed file: {f_tosort['full_path']} - file confliction in date directory {sortby_value}.', eventType='fileSortError')
+                    else:
+                        sorted_file_structure[sortby_value].append(f_uuid)
+                    ###^ UNTESTED ^###
                 else:
-                    missed_files.append(f_tosort['file'])
+                    self.logEvent(event=f'missed file: {f_tosort['file']} - file extension not in selected extensions.', eventType='fileSortError')
         self.sorted_file_structure = sorted_file_structure
         self.missed_files = missed_files
         #print('STAGED SORT.')
@@ -149,4 +179,5 @@ class ds:
                     #print(f'ERROR WITH FILE {ref_file}.\n EXCEPTION: {e}')
             progbar.update(current_count=curr, max=maxval)
         progbar.update(current_count=0, max=maxval)
+        self.logEvent(event=f'SORT COMPLETE.')
         #print('COPY COMPLETE.')
